@@ -1,0 +1,213 @@
+<!DOCTYPE HTML>
+<html lang="en">
+	<head>
+		<title>three.js webgl - interactive - voxel painter</title>
+		<meta charset="utf-8">
+		<style type="text/css">
+			body {
+				font-family: Monospace;
+				background-color: #f0f0f0;
+				margin: 0px;
+				overflow: hidden;
+			}
+
+			#oldie { background-color: #ddd !important }
+		</style>
+	</head>
+	<body>
+
+		<script type="text/javascript" src="../build/Three.js"></script>
+
+		<script type="text/javascript" src="js/Detector.js"></script>
+		<script type="text/javascript" src="js/RequestAnimationFrame.js"></script>
+		<script type="text/javascript" src="js/Stats.js"></script>
+    <script type="text/javascript" src="js/Tween.js"></script>
+
+		<script type="text/javascript">
+
+			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+
+			var container, stats;
+			var camera, scene, renderer;
+			var plane, cube;
+			var mouse2D, mouse3D, ray,
+			rollOveredFace, isShiftDown = false,
+			theta = 45, isCtrlDown = false;
+
+			var cubeGeo, cubeMaterial, cubeTargetMaterial;
+      var voxel, voxelTarget;
+
+      var direction, tmpPos;
+
+			init();
+			animate();
+
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				var info = document.createElement( 'div' );
+				info.style.position = 'absolute';
+				info.style.top = '10px';
+				info.style.width = '100%';
+				info.style.textAlign = 'center';
+				info.innerHTML = '<a href="http://github.com/mrdoob/three.js" target="_blank">three.js</a> - voxel painter - webgl<br /><strong>click</strong>: add voxel, <strong>control + click</strong>: remove voxel, <strong>shift + click</strong>: rotate, <a href="javascript:save();return false;">save .png</a>';
+				container.appendChild( info );
+
+				camera = new THREE.Camera( 40, window.innerWidth / window.innerHeight, 1, 10000 );
+				camera.position.y = 800;
+				camera.target.position.y = 100;
+
+				scene = new THREE.Scene();
+
+				// cubes
+
+				cubeGeo = new THREE.CubeGeometry( 50, 50, 50 );
+				cubeMaterial = new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe: true, opacity: 0.5 } );
+				// picking
+
+
+				// grid
+
+				plane = new THREE.Mesh( new THREE.PlaneGeometry( 1000, 1000, 20, 20 ), new THREE.MeshBasicMaterial( { color: 0x555555, wireframe: true, opacity: 0.2 } ) );
+				plane.rotation.x = - 90 * Math.PI / 180;
+				scene.addObject( plane );
+
+				mouse2D = new THREE.Vector3( 0, 10000, 0.5 );
+				ray = new THREE.Ray( camera.position, null );
+
+        voxel = new THREE.Mesh( cubeGeo, cubeMaterial );
+        randomize( voxel );
+        scene.addObject( voxel );
+
+        cubeTargetMaterial = new THREE.MeshBasicMaterial( { color: 0x0000ff, wireframe: true, opacity: 0.5 } );
+
+        voxelTarget = new THREE.Mesh( cubeGeo, cubeTargetMaterial );
+        randomize( voxelTarget );
+        scene.addObject( voxelTarget );
+
+        direction = new THREE.Vector3();
+        tmpObj = new THREE.Object3D();
+
+				// Lights
+
+				var ambientLight = new THREE.AmbientLight( 0xffffff );
+				scene.addLight( ambientLight );
+
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+				container.appendChild( renderer.domElement );
+
+				stats = new Stats();
+				stats.domElement.style.position = 'absolute';
+				stats.domElement.style.top = '0px';
+				container.appendChild( stats.domElement );
+
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+				document.addEventListener( 'keydown', onDocumentKeyDown, false );
+				document.addEventListener( 'keyup', onDocumentKeyUp, false );
+
+        function moveLater() {
+          moveTarget();
+          setTimeout( moveLater, Math.random() * 1000);
+        }
+
+        moveLater();
+
+			}
+
+      function followTarget() {
+        direction.sub( voxelTarget.position, voxel.position );
+        direction.multiplyScalar( 0.2 );
+        voxel.position.addSelf( direction );
+
+        direction.sub( voxelTarget.rotation, voxel.rotation );
+        direction.multiplyScalar( 0.2 );
+        voxel.rotation.addSelf( direction );
+      }
+
+      function moveTarget() {
+        randomize( tmpObj );
+        new TWEEN.Tween( voxelTarget.position ).to( tmpObj.position, 1000 ).easing( TWEEN.Easing.Quartic.EaseInOut ).start();
+        new TWEEN.Tween( voxelTarget.rotation ).to( tmpObj.rotation, 1000 ).easing( TWEEN.Easing.Quartic.EaseInOut ).start();
+      }
+
+      function randomize( object ) {
+        object.position.set(
+          Math.random() * 800 - 400,
+          Math.random() * 200,
+          Math.random() * 800 - 400
+        );
+        object.rotation.set (
+          ( Math.random() * 360 ) * Math.PI / 180,
+          ( Math.random() * 360 ) * Math.PI / 180,
+          ( Math.random() * 360 ) * Math.PI / 180
+        );
+      }
+
+			function onDocumentMouseMove( event ) {
+
+				event.preventDefault();
+
+				mouse2D.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+				mouse2D.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+			}
+
+			function onDocumentKeyDown( event ) {
+
+				switch( event.keyCode ) {
+
+					case 16: isShiftDown = true; break;
+					case 17: isCtrlDown = true; break;
+
+				}
+
+			}
+
+			function onDocumentKeyUp( event ) {
+
+				switch( event.keyCode ) {
+
+					case 16: isShiftDown = false; break;
+					case 17: isCtrlDown = false; break;
+
+				}
+			}
+
+			//
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				render();
+				stats.update();
+
+			}
+
+			function render() {
+
+        TWEEN.update();
+
+        followTarget();
+
+				if ( isShiftDown ) {
+
+					theta += mouse2D.x * 3;
+
+				}
+
+				camera.position.x = 1400 * Math.sin( theta * Math.PI / 360 );
+				camera.position.z = 1400 * Math.cos( theta * Math.PI / 360 );
+
+				renderer.render( scene, camera );
+
+			}
+
+		</script>
+
+	</body>
+</html>
